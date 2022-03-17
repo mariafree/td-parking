@@ -2230,3 +2230,5 @@ pkspaces['time']=pkspaces['day']+' '+pkspaces['time']
 pkspaces=pkspaces[['time','geoid','free','metered','no','total']].reset_index(drop=True)
 pkspaces.to_csv('C:/Users/mayij/Desktop/parking/CTTIMEPKSPACES.csv',index=False,na_rep=0)
 
+
+
