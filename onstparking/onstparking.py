@@ -2169,3 +2169,64 @@ print(datetime.datetime.now()-start)
 
 
 
+
+
+# Summarize parking spaces by census tract by time period
+taglist=[str(x)+str(y) for x in ['m','t','w','r','f','s','u'] for y in [str(x)[11:13]+str(x)[14:16] for x in pd.date_range('00:00','23:30',freq='30min')]]
+ct=gpd.read_file('C:/Users/mayij/Desktop/parking/nyct2020wi.shp')
+ct.crs=2263
+ct=ct.to_crs(6539)
+dotregsignsumhdtgm=gpd.read_file('C:/Users/mayij/Desktop/parking/SIGNSUMAGGHDTGM.shp')
+dotregsignsumhdtgm.crs=4326
+dotregsignsumhdtgm=dotregsignsumhdtgm.to_crs(6539)
+dotregsignsumhdtgm['signsumspaces']=[int(x.length/21) for x in dotregsignsumhdtgm['geometry']]
+dotregsignsumhdtgm['sign']=dotregsignsumhdtgm['m']+dotregsignsumhdtgm['t']+dotregsignsumhdtgm['w']+dotregsignsumhdtgm['r']+dotregsignsumhdtgm['f']+dotregsignsumhdtgm['s']+dotregsignsumhdtgm['u']
+dotregsignsumhdtgm=gpd.sjoin(dotregsignsumhdtgm,ct,how='left',op='intersects')
+dotregsignsumhdtgm=dotregsignsumhdtgm[['GEOID','medians','hdt','parkable','sign','signsumspaces']].reset_index(drop=True)
+for i in range(0,len(taglist)):
+    dotregsignsumhdtgm[taglist[i]+'free']=[str(x)[i] for x in dotregsignsumhdtgm['sign']]
+    dotregsignsumhdtgm[taglist[i]+'free']=np.where((dotregsignsumhdtgm['medians']==0)&(dotregsignsumhdtgm['hdt']==0)&(dotregsignsumhdtgm['parkable']==1)&(dotregsignsumhdtgm[taglist[i]+'free']=='1'),'1','0')
+    dotregsignsumhdtgm[taglist[i]+'free']=pd.to_numeric(dotregsignsumhdtgm[taglist[i]+'free'])*dotregsignsumhdtgm['signsumspaces']
+for i in range(0,len(taglist)):
+    dotregsignsumhdtgm[taglist[i]+'metered']=[str(x)[i] for x in dotregsignsumhdtgm['sign']]
+    dotregsignsumhdtgm[taglist[i]+'metered']=np.where((dotregsignsumhdtgm['medians']==0)&(dotregsignsumhdtgm['hdt']==0)&(dotregsignsumhdtgm['parkable']==1)&(dotregsignsumhdtgm[taglist[i]+'metered']=='2'),'1','0')
+    dotregsignsumhdtgm[taglist[i]+'metered']=pd.to_numeric(dotregsignsumhdtgm[taglist[i]+'metered'])*dotregsignsumhdtgm['signsumspaces']
+for i in range(0,len(taglist)):
+    dotregsignsumhdtgm[taglist[i]+'no']=[str(x)[i] for x in dotregsignsumhdtgm['sign']]
+    dotregsignsumhdtgm[taglist[i]+'no']=np.where((dotregsignsumhdtgm['medians']!=0)|(dotregsignsumhdtgm['hdt']!=0)|(dotregsignsumhdtgm['parkable']!=1)|(dotregsignsumhdtgm[taglist[i]+'no']=='3'),'1','0')
+    dotregsignsumhdtgm[taglist[i]+'no']=pd.to_numeric(dotregsignsumhdtgm[taglist[i]+'no'])*dotregsignsumhdtgm['signsumspaces']
+dotregsignsumhdtgm=dotregsignsumhdtgm.groupby('GEOID',as_index=False)[dotregsignsumhdtgm.columns[6:]].sum().reset_index(drop=True)
+dotregsignsumhdtgm=dotregsignsumhdtgm.melt(id_vars='GEOID',value_vars=dotregsignsumhdtgm.columns[1:]).reset_index(drop=True)
+dotregsignsumhdtgm['geoid']=dotregsignsumhdtgm['GEOID'].copy()
+dotregsignsumhdtgm['time']=[str(x)[0:5] for x in dotregsignsumhdtgm['variable']]
+dotregsignsumhdtgm['sign']=[str(x)[5:] for x in dotregsignsumhdtgm['variable']]
+dotregsignsumhdtgm=dotregsignsumhdtgm.pivot(index=['geoid','time'],columns='sign',values='value').reset_index(drop=False)
+lionbfpknosignhdtgm=gpd.read_file('C:/Users/mayij/Desktop/parking/LIONBFPKNOSIGNHDTGM.shp')
+lionbfpknosignhdtgm.crs=4326
+lionbfpknosignhdtgm=lionbfpknosignhdtgm.to_crs(6539)
+lionbfpknosignhdtgm['lionbfpknosignspaces']=[int(x.length/21) for x in lionbfpknosignhdtgm['geometry']]
+lionbfpknosignhdtgm['sign']=np.where(lionbfpknosignhdtgm['medians']==1,'lionno',
+                            np.where(lionbfpknosignhdtgm['hdt']==1,'lionno',
+                            np.where(lionbfpknosignhdtgm['parkable']==0,'lionno','lionfree')))
+lionbfpknosignhdtgm=gpd.sjoin(lionbfpknosignhdtgm,ct,how='left',op='intersects')
+lionbfpknosignhdtgm=lionbfpknosignhdtgm.groupby(['GEOID','sign'],as_index=False).agg({'lionbfpknosignspaces':'sum'}).reset_index(drop=True)
+lionbfpknosignhdtgm['geoid']=lionbfpknosignhdtgm['GEOID'].copy()
+lionbfpknosignhdtgm=lionbfpknosignhdtgm.pivot(index='geoid',columns='sign',values='lionbfpknosignspaces').reset_index(drop=False)
+pkspaces=pd.merge(dotregsignsumhdtgm,lionbfpknosignhdtgm,how='left',on='geoid')
+pkspaces=pkspaces.fillna(0)
+pkspaces['free']=pkspaces['free']+pkspaces['lionfree']
+pkspaces['no']=pkspaces['no']+pkspaces['lionno']
+pkspaces['total']=pkspaces['free']+pkspaces['metered']
+pkspaces['day']=[str(x)[0] for x in pkspaces['time']]
+pkspaces['day']=np.where(pkspaces['day']=='m','Monday',
+                np.where(pkspaces['day']=='t','Tuesday',
+                np.where(pkspaces['day']=='w','Wednesday',
+                np.where(pkspaces['day']=='r','Thursday',
+                np.where(pkspaces['day']=='f','Friday',
+                np.where(pkspaces['day']=='s','Saturday',
+                np.where(pkspaces['day']=='u','Sunday','Other')))))))
+pkspaces['time']=[str(x)[1:3]+':'+str(x)[3:5] for x in pkspaces['time']]
+pkspaces['time']=pkspaces['day']+' '+pkspaces['time']
+pkspaces=pkspaces[['time','geoid','free','metered','no','total']].reset_index(drop=True)
+pkspaces.to_csv('C:/Users/mayij/Desktop/parking/CTTIMEPKSPACES.csv',index=False,na_rep=0)
+
