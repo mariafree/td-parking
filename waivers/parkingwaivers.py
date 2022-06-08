@@ -42,6 +42,7 @@ client = Socrata(data_link, app_token)
 #         'CompltYear',
 #         'UnitsCO',
 #         'ZoningDst1',
+#         'CommntyDst',
 #         'Latitude',
 #         'Longitude']
 
@@ -68,8 +69,10 @@ client = Socrata(data_link, app_token)
 
 reslots_df = pd.read_csv(path + 'output/reslots.csv')
 
-# determine if a lot in a lower density growth management area, the manhattan core or the long island city area 
+# determine if a lot in a lower density growth management area, the manhattan core (CD 1-8) or the long island city area 
 ldgma_gdf = gpd.read_file('https://services5.arcgis.com/GfwWNkhOj9bNBqoJ/arcgis/rest/services/nyldgma/FeatureServer/0/query?where=1=1&outFields=*&outSR=4326&f=pgeojson')
+
+mnc_li = ['101','102', '103', '104', '105', '106', '107', '108'] 
 
 # permitted off-street parking in the manhattan core (zr 13-10) and long island city area (zr 16-10)
 
